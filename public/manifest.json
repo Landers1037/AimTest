@@ -1,0 +1,18 @@
+{
+  "name": "AimTest - 3D射击训练游戏",
+  "short_name": "AimTest",
+  "description": "基于Web的3D射击训练游戏，提升你的瞄准技能",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["games", "education"],
+  "orientation": "landscape"
+}
