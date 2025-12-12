@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { CircleTargetManager } from '@/engine/CircleTargetManager';
-import { ShootingSystem2D } from '@/engine/ShootingSystem2D';
+import { TargetManager } from '@/engine/TargetManager';
+import { ShootingSystem } from '@/engine/ShootingSystem';
+import { ParticleManager } from '@/engine/ParticleManager';
 import { CrosshairManager } from '@/engine/CrosshairManager';
 import { GameSettings, GameState, Target } from '@/types/game';
 
@@ -11,6 +12,7 @@ interface GameSceneProps {
   score: number;
   timeLeft: number;
   onScoreUpdate: (newScore: number) => void;
+  onShoot: () => void;
   onGameEnd: () => void;
 }
 
@@ -20,14 +22,16 @@ export default function GameScene({
   score, 
   timeLeft, 
   onScoreUpdate, 
+  onShoot,
   onGameEnd 
 }: GameSceneProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const circleManagerRef = useRef<CircleTargetManager | null>(null);
-  const shooting2DRef = useRef<ShootingSystem2D | null>(null);
+  const targetManagerRef = useRef<TargetManager | null>(null);
+  const shootingSystemRef = useRef<ShootingSystem | null>(null);
+  const particleManagerRef = useRef<ParticleManager | null>(null);
   const crosshairManagerRef = useRef<CrosshairManager | null>(null);
   const animationIdRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
@@ -49,8 +53,12 @@ export default function GameScene({
     sceneRef.current = scene;
 
     // 创建相机
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    camera.position.set(0, 0, 10);
+    // 使用较小的FOV（视场角）来减少透视畸变，使球体在屏幕边缘看起来更圆
+    // 原来是75度，现在改为30度，并相应拉远相机距离以保持视野范围不变
+    // 计算公式：Distance = (VisibleHeight / 2) / tan(FOV / 2)
+    // 目标高度约16单位，tan(15°) ≈ 0.268，Distance ≈ 8 / 0.268 ≈ 30
+    const camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 1000);
+    camera.position.set(0, 0, 30);
     cameraRef.current = camera;
 
     // 创建渲染器
@@ -69,8 +77,9 @@ export default function GameScene({
     // 创建光照
     setupLighting(scene);
 
-    circleManagerRef.current = new CircleTargetManager(container);
-    shooting2DRef.current = new ShootingSystem2D(container);
+    targetManagerRef.current = new TargetManager(scene);
+    shootingSystemRef.current = new ShootingSystem(camera);
+    particleManagerRef.current = new ParticleManager(scene);
     crosshairManagerRef.current = new CrosshairManager(container);
 
     // 更新准星样式
@@ -131,16 +140,20 @@ export default function GameScene({
 
       if (deltaTime > 0.1) return; // 防止大的时间跳跃
 
-      if (circleManagerRef.current) {
-        circleManagerRef.current.updateTargets(deltaTime);
+      if (targetManagerRef.current) {
+        targetManagerRef.current.updateTargets(deltaTime);
+      }
+
+      if (particleManagerRef.current) {
+        particleManagerRef.current.update(deltaTime);
       }
 
       // 生成新目标
       spawnTimerRef.current += deltaTime;
       if (spawnTimerRef.current >= 2 / settings.spawnDensity) { // 根据密度调整生成频率
         spawnTimerRef.current = 0;
-        if (circleManagerRef.current) {
-          circleManagerRef.current.spawnTarget(settings);
+        if (targetManagerRef.current) {
+          targetManagerRef.current.spawnTarget(settings);
         }
       }
 
@@ -164,24 +177,26 @@ export default function GameScene({
 
   // 处理鼠标点击
   const handleClick = (event: React.MouseEvent) => {
-    if (gameState !== GameState.PLAYING || !shooting2DRef.current || !circleManagerRef.current || !mountRef.current) {
+    if (gameState !== GameState.PLAYING || !shootingSystemRef.current || !targetManagerRef.current || !mountRef.current) {
       return;
     }
 
-    const rect = mountRef.current.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
     // 更新鼠标位置
-    shooting2DRef.current.updateMousePosition(event.clientX, event.clientY);
+    shootingSystemRef.current.updateMousePosition(event.clientX, event.clientY, mountRef.current);
+
+    // 记录射击
+    onShoot();
 
     // 检测命中
-    const targets = circleManagerRef.current.getTargets();
-    const hitTarget = shooting2DRef.current.checkHit(targets);
+    const targets = targetManagerRef.current.getTargets();
+    const hitTarget = shootingSystemRef.current.checkHit(targets);
 
     if (hitTarget) {
-      circleManagerRef.current.createExplosion(hitTarget.center.x, hitTarget.center.y, hitTarget.color);
-      circleManagerRef.current.removeTarget(hitTarget);
+      // 爆炸效果
+      if (particleManagerRef.current) {
+        particleManagerRef.current.createExplosion(hitTarget.position, hitTarget.color);
+      }
+      targetManagerRef.current.removeTarget(hitTarget);
       onScoreUpdate(score + 1);
     } else {
       // 未命中效果（可选）
@@ -237,8 +252,11 @@ export default function GameScene({
   // 清理函数
   useEffect(() => {
     return () => {
-      if (circleManagerRef.current) {
-        circleManagerRef.current.clearTargets();
+      if (targetManagerRef.current) {
+        targetManagerRef.current.clearTargets();
+      }
+      if (particleManagerRef.current) {
+        particleManagerRef.current.clearParticles();
       }
     };
   }, []);

@@ -16,6 +16,8 @@ export default {
         'starlight': '#16213e',
       },
       fontFamily: {
+        // 默认字体
+        sans: ['"Noto Sans SC"', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
         // 科技感字体
         'orbitron': ['Orbitron', 'monospace'],
         'roboto-mono': ['Roboto Mono', 'monospace'],

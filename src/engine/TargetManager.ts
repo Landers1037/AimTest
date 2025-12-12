@@ -17,15 +17,19 @@ export class TargetManager {
 
   // 生成新目标
   spawnTarget(settings: GameSettings): Target {
-    const geometry = new THREE.SphereGeometry(settings.targetSize, 32, 32);
-    const material = new THREE.MeshPhongMaterial({ 
+    const geometry = new THREE.SphereGeometry(settings.targetSize, 64, 64);
+    const material = new THREE.MeshStandardMaterial({ 
       color: settings.targetColor,
+      roughness: 0.1,
+      metalness: 0.1,
       emissive: settings.targetColor,
-      emissiveIntensity: 0.3
+      emissiveIntensity: 0.2
     });
     
     const mesh = new THREE.Mesh(geometry, material);
     mesh.scale.set(1, 1, 1);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
     
     // 随机位置
     const position = this.getRandomPosition();
@@ -49,6 +53,8 @@ export class TargetManager {
     this.targets.push(target);
     return target;
   }
+
+
 
   // 根据游戏模式获取速度
   private getVelocityByMode(gameMode: GameMode, moveSpeed: number): THREE.Vector3 {
@@ -96,19 +102,7 @@ export class TargetManager {
     });
     
     // 移除已销毁的目标
-    this.targets = this.targets.filter(target => {
-      if (target.destroyed) {
-        this.scene.remove(target.mesh);
-        target.mesh.geometry.dispose();
-        if (Array.isArray(target.mesh.material)) {
-          target.mesh.material.forEach(material => material.dispose());
-        } else {
-          target.mesh.material.dispose();
-        }
-        return false;
-      }
-      return true;
-    });
+    this.targets = this.targets.filter(target => !target.destroyed);
   }
 
   // 处理边界碰撞
@@ -151,9 +145,15 @@ export class TargetManager {
 
   // 移除目标
   removeTarget(target: Target): void {
+    target.destroyed = true;
+    this.scene.remove(target.mesh);
+    if (target.mesh.geometry) target.mesh.geometry.dispose();
+    if (target.mesh.material instanceof THREE.Material) target.mesh.material.dispose();
+    
+    // 从数组中移除
     const index = this.targets.indexOf(target);
     if (index > -1) {
-      target.destroyed = true;
+      this.targets.splice(index, 1);
     }
   }
 
@@ -166,11 +166,11 @@ export class TargetManager {
   clearTargets(): void {
     this.targets.forEach(target => {
       this.scene.remove(target.mesh);
-      target.mesh.geometry.dispose();
+      if (target.mesh.geometry) target.mesh.geometry.dispose();
       if (Array.isArray(target.mesh.material)) {
         target.mesh.material.forEach(material => material.dispose());
       } else {
-        target.mesh.material.dispose();
+        if (target.mesh.material instanceof THREE.Material) target.mesh.material.dispose();
       }
     });
     this.targets = [];

@@ -35,6 +35,9 @@ export default function Home() {
 
   const handleScoreUpdate = (newScore: number) => {
     updateScore(newScore);
+  };
+
+  const handleShoot = () => {
     updateShots();
   };
 
@@ -76,6 +79,10 @@ export default function Home() {
                 <Target className="w-4 h-4" />
                 <span>准确率: {accuracy}%</span>
               </div>
+              <div className="flex items-center gap-2 text-blue-400">
+                <Target className="w-4 h-4" />
+                <span>瞄准率: {totalHits}/{totalShots}</span>
+              </div>
             </div>
           </div>
 
@@ -107,6 +114,7 @@ export default function Home() {
           score={score}
           timeLeft={timeLeft}
           onScoreUpdate={handleScoreUpdate}
+          onShoot={handleShoot}
           onGameEnd={handleGameEnd}
         />
 
